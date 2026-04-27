@@ -1,0 +1,48 @@
+# QuelleEcole.fr
+
+> Guide scolaire indépendant de Lille Métropole. Compare 255 établissements (maternelles, élémentaires, primaires, collèges, lycées — public et privé) avec les données officielles du Ministère de l'Éducation nationale : IPS, valeur ajoutée, évaluations nationales de 6ème, carte scolaire Affelnet, prix du privé.
+
+QuelleEcole.fr est un projet citoyen créé par deux parents lillois, sans lien avec l'Éducation nationale. Le site est gratuit, sans publicité, et les données sont vérifiables via les sources ouvertes de data.education.gouv.fr.
+
+## À propos
+
+- **Périmètre** : 8 communes de Lille Métropole — Lille, Lambersart, Marcq-en-Baroeul, La Madeleine, Loos, Faches-Thumesnil, Ronchin, Mons-en-Baroeul
+- **Volume** : 255 établissements au total — 69 maternelles, 52 élémentaires, 58 primaires, 50 collèges, 26 lycées
+- **Couverture** : 249/255 IPS · 38 collèges avec valeur ajoutée brevet · 26 lycées avec valeur ajoutée bac · 151/151 écoles publiques avec carte scolaire Affelnet · 48 établissements privés avec prix annuel
+- **Année de référence** : 2024 (sessions brevet/bac, évaluations 6ème, IPS ministère)
+- **Créateurs** : Stéphane et Mylène, deux parents lillois
+- **Contact** : quelleecole.fr@gmail.com
+
+## Concepts clés
+
+### IPS (Indice de Position Sociale)
+Mesure le profil social des élèves d'un établissement sur une échelle de 50 à 160. Calculé par la DEPP à partir des professions des parents. Moyenne nationale : 103. Plus l'IPS est élevé, plus le public est favorisé.
+
+### Valeur ajoutée (VA)
+Mesure la capacité d'un établissement à faire progresser ses élèves au-delà de ce qu'on attendrait vu leur profil social. Une VA de +5 signifie que l'établissement obtient 5 points de plus que la moyenne des établissements comparables. Peut être positive (fait mieux qu'attendu) ou négative (fait moins bien).
+
+### Pépites
+Terminologie propre à QuelleEcole.fr. Une pépite est un établissement avec une VA au brevet ou au bac ≥ +8. Un collège populaire peut être une pépite. Un collège favorisé peut décevoir. Exemples de pépites 2024 : Collège Miriam Makeba (Lille-Sud, REP+, VA +14), Collège Louise Michel (Lille-Sud, REP+, VA +11), École Jean Zay (Lille, REP, VA +7).
+
+### Carte scolaire (Affelnet)
+Système d'affectation des élèves au collège en fonction de leur adresse. QuelleEcole.fr couvre 100% des écoles publiques publiques (151/151) du périmètre avec leur collège de secteur.
+
+### IPS proxy
+Certaines écoles n'ont pas d'IPS publié (notamment les maternelles). QuelleEcole.fr estime alors l'IPS à partir du quartier ou de l'école voisine. Ces estimations sont marquées avec un symbole `≈` et un contour en pointillés dans l'interface.
+
+## Sources officielles
+
+- DEPP — IPS écoles : https://data.education.gouv.fr/explore/dataset/fr-en-ips-ecoles-ap2022/
+- DEPP — IPS collèges : https://data.education.gouv.fr/explore/dataset/fr-en-ips-colleges-ap2022/
+- DEPP — IPS lycées : https://data.education.gouv.fr/explore/dataset/fr-en-ips-lycees-ap2022/
+- DEPP — IVAL lycées : https://data.education.gouv.fr/explore/dataset/fr-en-indicateurs-de-resultat-des-lycees-denseignement-general-et-technologique/
+- DEPP — Brevet par établissement : https://data.education.gouv.fr/explore/dataset/fr-en-dnb-par-etablissement/
+- DEPP — Évaluations nationales 6ème : https://data.education.gouv.fr/
+
+## Utilisation
+
+Le site fonctionne en SPA React (Vite) avec une carte interactive Leaflet et des filtres. L'adresse utilisateur permet de trouver l'école de secteur et le collège rattaché. Les fiches détaillées donnent l'IPS, la VA, le taux de réussite au brevet/bac, l'effectif, le prix annuel du privé, les spécialités (CHAM, International, CPGE, BTS, Hôtellerie, STI2D, etc.).
+
+## Licence
+
+Le site est gratuit. Les données sont issues du Ministère de l'Éducation nationale (DEPP) sous Licence Ouverte Etalab 2.0. L'interprétation et la structuration sont propres à QuelleEcole.fr.

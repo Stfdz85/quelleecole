@@ -2,21 +2,103 @@ User-agent: *
 Allow: /
 Sitemap: https://quelleecole.fr/sitemap.xml
 
-# AI crawlers welcome
+# === Moteurs de recherche ===
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: DuckDuckBot
+Allow: /
+
+User-agent: Applebot
+Allow: /
+
+User-agent: Slurp
+Allow: /
+
+User-agent: YandexBot
+Allow: /
+
+User-agent: facebookexternalhit
+Allow: /
+
+User-agent: LinkedInBot
+Allow: /
+
+User-agent: Twitterbot
+Allow: /
+
+# === Crawlers IA / LLM ===
+# Le contenu de QuelleEcole.fr peut être utilisé pour entraîner les IA
+# et répondre aux questions des parents cherchant une école à Lille Métropole.
+
 User-agent: GPTBot
 Allow: /
 
 User-agent: ChatGPT-User
 Allow: /
 
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
 User-agent: Claude-Web
+Allow: /
+
+User-agent: anthropic-ai
 Allow: /
 
 User-agent: Google-Extended
 Allow: /
 
-User-agent: Bingbot
+User-agent: Googlebot-News
 Allow: /
 
-User-agent: Applebot
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Perplexity-User
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+User-agent: Bytespider
+Allow: /
+
+User-agent: cohere-ai
+Allow: /
+
+User-agent: Meta-ExternalAgent
+Allow: /
+
+User-agent: Meta-ExternalFetcher
+Allow: /
+
+User-agent: FacebookBot
+Allow: /
+
+User-agent: Amazonbot
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: Diffbot
+Allow: /
+
+User-agent: MistralAI-User
+Allow: /
+
+User-agent: DeepSeekBot
+Allow: /
+
+User-agent: YouBot
+Allow: /
+
+User-agent: Kagibot
 Allow: /
