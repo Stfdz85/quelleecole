@@ -105,6 +105,16 @@ function App() {
   const [tourReplayVisible, setTourReplayVisible] = useState(false);
   const [onboardingVisible, setOnboardingVisible] = useState(true);
   const [bubble, setBubble] = useState(null);
+  const [compareIds, setCompareIds] = useState([]); // 0 à 2 écoles à comparer
+  const [compareOpen, setCompareOpen] = useState(false); // Modal comparateur ouvert
+  
+  function toggleCompare(id) {
+    setCompareIds(prev => {
+      if (prev.includes(id)) return prev.filter(x => x !== id);
+      if (prev.length >= 2) return [prev[1], id]; // garde la plus récente + nouvelle
+      return [...prev, id];
+    });
+  }
   
   const mapRef = useRef(null);
   const leafletMapRef = useRef(null);
@@ -114,8 +124,7 @@ function App() {
   // Filter + sort
   const list = useMemo(() => {
     let arr = [...D];
-    if (filter === 'pepite') arr = arr.filter(isPepite);
-    else if (filter === 'ep') arr = arr.filter(s => s.t === 'e' || s.t === 'p'); // Élém + Prim fusionnés (Maternelles séparé)
+    if (filter === 'ep') arr = arr.filter(s => s.t === 'e' || s.t === 'p'); // Élém + Prim fusionnés (Maternelles séparé)
     else if (filter !== 'all') arr = arr.filter(s => s.t === filter);
     
     if (search.trim()) {
@@ -304,6 +313,17 @@ function App() {
           <span className="brand-badge">BETA</span>
         </div>
         <div className="top-actions">
+          {compareIds.length > 0 && (
+            <button 
+              className="compare-btn"
+              onClick={() => compareIds.length === 2 ? setCompareOpen(true) : null}
+              title={compareIds.length === 2 ? "Comparer les 2 écoles" : "Sélectionnez une 2e école pour comparer"}
+            >
+              <span className="compare-btn-icon">⇄</span>
+              <span className="compare-btn-count">{compareIds.length}/2</span>
+              <button className="compare-btn-close" onClick={(e) => { e.stopPropagation(); setCompareIds([]); }} title="Effacer">×</button>
+            </button>
+          )}
           <button className="icon-btn" title="Comment ça marche ?" onClick={() => setBubble('ips')}>?</button>
           <a
             className="support-btn"
@@ -338,11 +358,9 @@ function App() {
             {key:'m', label:'Maternelles', color:'#5DADE2'},
             {key:'ep', label:'Élémentaires', color:'#E8A135'},
             {key:'c', label:'Collèges', color:'#2874A6'},
-            {key:'l', label:'Lycées', color:'#1B4F72'},
-            {key:'pepite', label:'✨ Pépites'}
+            {key:'l', label:'Lycées', color:'#1B4F72'}
           ].map(f => {
             const count = f.key === 'all' ? D.length :
-              f.key === 'pepite' ? D.filter(isPepite).length :
               f.key === 'ep' ? D.filter(s => s.t === 'e' || s.t === 'p').length :
               D.filter(s => s.t === f.key).length;
             return (
@@ -407,7 +425,21 @@ function App() {
         onSelect={setSelectedId}
         onBack={() => { setSelectedId(null); setSheetState('open'); }}
         onSetBubble={setBubble}
+        compareIds={compareIds}
+        onToggleCompare={toggleCompare}
       />
+      
+      {/* COMPARE MODAL */}
+      {compareOpen && (
+        <CompareModal
+          ids={compareIds}
+          onClose={() => setCompareOpen(false)}
+          onRemove={(id) => {
+            setCompareIds(prev => prev.filter(x => x !== id));
+            if (compareIds.length <= 1) setCompareOpen(false);
+          }}
+        />
+      )}
       
       {/* ADDRESS MODAL */}
       <AddressModal
@@ -440,7 +472,7 @@ function App() {
 
 /* =========== COMPONENTS =========== */
 
-function Sheet({ state, setState, list, selected, sort, setSort, onSelect, onBack, onSetBubble }) {
+function Sheet({ state, setState, list, selected, sort, setSort, onSelect, onBack, onSetBubble, compareIds, onToggleCompare }) {
   const sheetRef = React.useRef(null);
   const dragRef = React.useRef({ active: false, startY: 0, startState: null, startTime: 0, lastY: 0 });
   const [dragOffset, setDragOffset] = React.useState(0);
@@ -600,7 +632,7 @@ function Sheet({ state, setState, list, selected, sort, setSort, onSelect, onBac
       </div>
       <div className="sheet-content">
         {selected ? (
-          <Detail s={selected} onBack={onBack} onSelect={onSelect} onSetBubble={onSetBubble} />
+          <Detail s={selected} onBack={onBack} onSelect={onSelect} onSetBubble={onSetBubble} compareIds={compareIds} onToggleCompare={onToggleCompare} />
         ) : list.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">⌕</div>
@@ -683,17 +715,29 @@ function SchoolCard({ s, onClick, index }) {
   );
 }
 
-function Detail({ s, onBack, onSelect, onSetBubble }) {
+function Detail({ s, onBack, onSelect, onSetBubble, compareIds, onToggleCompare }) {
   const va = getVA(s);
   const br = s.iv?.brevet ?? s.iv?.bac;
   const ipsPos = s.i ? Math.min(98, Math.max(2, (s.i - 55) / 100 * 100)) : 50;
   const pep = isPepite(s);
   const cs = s.cs && typeof s.cs === 'object' ? s.cs : null;
   const linkedCollege = cs && cs.n ? D.find(x => x.t === 'c' && x.n.replace(/\s+/g,'').toLowerCase() === cs.n.replace('Collège ','').replace(/\s+/g,'').toLowerCase().replace(/\(.+?\)/,'')) : null;
+  const inCompare = compareIds?.includes(s.id);
   
   return (
     <div className="detail">
-      <button className="detail-back" onClick={onBack}>← Retour à la liste</button>
+      <div className="detail-actions">
+        <button className="detail-back" onClick={onBack}>← Retour à la liste</button>
+        {onToggleCompare && (
+          <button
+            className={`detail-compare ${inCompare ? 'active' : ''}`}
+            onClick={() => onToggleCompare(s.id)}
+            title={inCompare ? "Retirer de la comparaison" : "Ajouter à la comparaison (max 2)"}
+          >
+            {inCompare ? '✓ Sélectionnée' : '⇄ Comparer'}
+          </button>
+        )}
+      </div>
       <div className="detail-head">
         <div className="detail-tags">
           <span className="tag tag-type">{TL[s.t]}</span>
@@ -838,12 +882,12 @@ function Detail({ s, onBack, onSelect, onSetBubble }) {
         </div>
       )}
       
-      {(s.ef || s.px || s.cl) && (
+      {(s.ef || s.px || s.px_nc || s.cl) && (
         <div className="detail-section">
           <div className="detail-section-h">Informations pratiques</div>
           <div className="kpi-grid">
             {s.ef && (
-              <div className={`kpi-card ${(!s.px && !s.cl) ? 'full' : ''}`}>
+              <div className={`kpi-card ${(!s.px && !s.px_nc && !s.cl) ? 'full' : ''}`}>
                 <div className="kpi-l">Effectif</div>
                 <div className="kpi-v">{s.ef}</div>
                 <div className="kpi-sub">élèves</div>
@@ -861,6 +905,13 @@ function Detail({ s, onBack, onSelect, onSetBubble }) {
                 <div className="kpi-l">Scolarité</div>
                 <div className="kpi-v">{s.px}€</div>
                 <div className="kpi-sub">par an</div>
+              </div>
+            )}
+            {!s.px && s.px_nc && (
+              <div className={`kpi-card ${!s.cl ? 'full' : ''}`}>
+                <div className="kpi-l">Scolarité</div>
+                <div className="kpi-v" style={{fontSize: '18px', color: 'var(--ink-4)'}}>NC</div>
+                <div className="kpi-sub">non communiqué</div>
               </div>
             )}
           </div>
@@ -939,9 +990,11 @@ function AddressModal({ open, onClose, input, setInput, result, onSelectAddress,
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setActiveIdx(i => Math.max(i - 1, -1));
-    } else if (e.key === 'Enter' && activeIdx >= 0) {
+    } else if (e.key === 'Enter') {
+      // Si aucune suggestion n'est mise en surbrillance, prend la première
       e.preventDefault();
-      handleSelect(suggestions[activeIdx]);
+      const idx = activeIdx >= 0 ? activeIdx : 0;
+      handleSelect(suggestions[idx]);
     }
   }
   
@@ -1172,6 +1225,118 @@ function HelpBubble({ topic, onClose }) {
           {paragraphs.map((p, i) => (
             <p key={i} dangerouslySetInnerHTML={{ __html: p.replace(/\n/g, '<br/>') }}></p>
           ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// ============================================================
+// COMPARATEUR — 2 écoles côte-à-côte
+// ============================================================
+function CompareModal({ ids, onClose, onRemove }) {
+  const schools = ids.map(id => D.find(s => s.id === id)).filter(Boolean);
+  
+  // Si une seule école, afficher un placeholder
+  const cols = [...schools];
+  while (cols.length < 2) cols.push(null);
+  
+  // Lignes de comparaison (key, label, render fn)
+  const rows = [
+    { k: 'type', label: 'Type', render: s => `${TL[s.t]} · ${SL[s.s]}` },
+    { k: 'addr', label: 'Adresse', render: s => `${s.c} · ${s.a}` },
+    { k: 'ips', label: 'IPS', help: 'ips', render: s => s.i ? (s.i_proxy ? `≈ ${Math.round(s.i)}` : Math.round(s.i)) : '—' },
+    { k: 'effectif', label: 'Effectif', render: s => s.ef || '—' },
+    { k: 'classes', label: 'Classes', render: s => s.cl || '—' },
+    { k: 'rep', label: 'Éducation prioritaire', render: s => 
+      s.f?.includes('REP+') ? 'REP+' : 
+      s.f?.includes('REP') ? 'REP' : 
+      '—'
+    },
+    { k: 'ulis', label: 'ULIS', render: s => s.f?.includes('ULIS') ? '✓' : '—' },
+    { k: 'cantine', label: 'Cantine', render: s => s.f?.includes('CANT') ? '✓' : '—' },
+    { k: 'specs', label: 'Spécialités', render: s => s.sp?.length ? s.sp.join(' · ') : '—' },
+    // Pour collèges
+    { k: 'brevet', label: 'Brevet', condition: s => s.t === 'c', render: s => s.iv?.brevet ? `${s.iv.brevet}%` : '—' },
+    { k: 'va_brevet', label: 'VA Brevet', help: 'va', condition: s => s.t === 'c', render: s => s.iv?.va_brevet != null ? vaSign(s.iv.va_brevet) : '—' },
+    { k: 'eval6e', label: 'Éval 6e maths', condition: s => s.t === 'c', render: s => s.ev?.ma_s ? s.ev.ma_s : '—' },
+    { k: 'eval6e_fr', label: 'Éval 6e français', condition: s => s.t === 'c', render: s => s.ev?.fr_s ? s.ev.fr_s : '—' },
+    // Pour lycées
+    { k: 'bac', label: 'Bac', condition: s => s.t === 'l', render: s => s.iv?.bac ? `${s.iv.bac}%` : '—' },
+    { k: 'va_bac', label: 'VA Bac', help: 'va', condition: s => s.t === 'l', render: s => s.iv?.va_bac != null ? vaSign(s.iv.va_bac) : '—' },
+    { k: 'mention', label: 'Mention', condition: s => s.t === 'l', render: s => s.iv?.men ? `${s.iv.men}%` : '—' },
+    { k: 'va_men', label: 'VA Mention', condition: s => s.t === 'l', render: s => s.iv?.va_men != null ? vaSign(s.iv.va_men) : '—' },
+    // Pour écoles primaires
+    { k: 'cs', label: 'Collège secteur', condition: s => s.t === 'e' || s.t === 'p' || s.t === 'm', render: s => 
+      s.cs ? (typeof s.cs === 'string' ? s.cs : s.cs.n) : '—'
+    },
+    // Privé
+    { k: 'prix', label: 'Scolarité', condition: s => s.s === 'v', render: s => 
+      s.px ? `${s.px} €/an` : 
+      s.px_nc ? 'NC' : 
+      '—'
+    },
+  ];
+  
+  // Filtrer les lignes pertinentes (au moins une école répond à la condition)
+  const relevantRows = rows.filter(r => 
+    !r.condition || schools.some(s => s && r.condition(s))
+  );
+  
+  return (
+    <div className="compare-modal" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="compare-panel">
+        <div className="compare-head">
+          <button className="compare-close" onClick={onClose}>✕ Fermer</button>
+          <div className="compare-title">Comparer 2 écoles</div>
+          <div className="compare-sub">Source · DEPP · Ministère de l'Éducation nationale</div>
+        </div>
+        
+        {/* Header avec 2 colonnes : nom + IPS + bouton retirer */}
+        <div className="compare-cols-head">
+          {cols.map((s, i) => (
+            <div key={i} className="compare-col-head">
+              {s ? (
+                <>
+                  <button className="compare-col-remove" onClick={() => onRemove(s.id)} title="Retirer">×</button>
+                  <div className="compare-col-tags">
+                    <span className="tag tag-type">{TL[s.t]}</span>
+                    <span className={`tag ${s.s === 'u' ? 'tag-public' : 'tag-prive'}`}>{SL[s.s]}</span>
+                  </div>
+                  <div className="compare-col-name">{s.n}</div>
+                  {s.i && (
+                    <div className="compare-col-ips" style={{ background: ipsColor(s.i) }}>
+                      IPS {Math.round(s.i)}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="compare-col-empty">
+                  <div className="compare-col-empty-icon">+</div>
+                  <div className="compare-col-empty-label">Sélectionnez une 2e école<br/><small>depuis la liste ou la carte</small></div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+        
+        {/* Tableau des lignes de comparaison */}
+        <div className="compare-rows">
+          {relevantRows.map(row => (
+            <div className="compare-row" key={row.k}>
+              <div className="compare-row-label">{row.label}</div>
+              {cols.map((s, i) => (
+                <div key={i} className="compare-row-cell">
+                  {s ? row.render(s) : '—'}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+        
+        <div className="compare-footer">
+          ℹ️ Les valeurs en italique (≈) sont des IPS estimés à partir de l'école voisine la plus proche.
         </div>
       </div>
     </div>
