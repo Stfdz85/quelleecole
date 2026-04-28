@@ -47,7 +47,6 @@ function getVA(s){
   if(s.t === 'l' && s.iv && typeof s.iv.va_bac !== 'undefined') return s.iv.va_bac;
   return null;
 }
-function isPepite(s){ const va = getVA(s); return va != null && va >= 8; }
 
 const HELP = {
   ips: {t:"IPS — Indice de Position Sociale",d:"L'IPS est un indicateur du Ministère de l'Éducation qui résume le profil socio-économique des familles d'une école. Il est calculé à partir des professions des deux parents. Plus il est élevé, plus les élèves viennent en moyenne de milieux favorisés.\n\nMoyenne nationale : 103. En dessous de 85 : milieu défavorisé. Au-dessus de 125 : milieu très favorisé.\n\n⚠️ Un IPS élevé ne signifie pas que l'école est « meilleure ». Il décrit le profil social, pas la qualité de l'enseignement.\n\nSource : DEPP (Direction de l'évaluation, de la prospective et de la performance), Ministère de l'Éducation nationale — data.education.gouv.fr"},
@@ -76,16 +75,8 @@ const TOUR_STEPS = [
     spotlightRadius: 55
   },
   {
-    targetSelector: '.qe-pin.pepite',
-    fallbackSelector: '.qe-pin',
-    title: '<span class="accent">2.</span> Les pépites cachées',
-    desc: 'Les pastilles avec <strong>★ étoile verte</strong> font mieux réussir leurs élèves que la moyenne nationale. <strong>Un collège populaire peut être une pépite. Un collège favorisé peut décevoir.</strong>',
-    position: 'bottom',
-    spotlightRadius: 50
-  },
-  {
     targetSelector: '.legend',
-    title: '<span class="accent">3.</span> L\'échelle IPS',
+    title: '<span class="accent">2.</span> L\'échelle IPS',
     desc: 'Chaque couleur = un <strong>milieu social</strong>. Orange = populaire, bleu foncé = favorisé. L\'écart à Lille Métropole atteint <strong>100 points</strong> entre deux écoles parfois voisines.',
     position: 'top',
     spotlightRadius: 100
@@ -185,9 +176,8 @@ function App() {
     list.forEach(s => {
       if (!s.la || !s.lo) return;
       const color = ipsColor(s.i);
-      const pep = isPepite(s);
-      const proxyClass = s.i_proxy ? 'proxy' : '';
-      const html = `<div class="qe-pin ${pep?'pepite':''} ${proxyClass}" data-id="${s.id}" style="background:${color}">${s.i ? Math.round(s.i) : '?'}</div>`;
+          const proxyClass = s.i_proxy ? 'proxy' : '';
+      const html = `<div class="qe-pin ${proxyClass}" data-id="${s.id}" style="background:${color}">${s.i ? Math.round(s.i) : '?'}</div>`;
       const icon = L.divIcon({ html, className: '', iconSize: [30,30], iconAnchor: [15,15] });
       const m = L.marker([s.la, s.lo], { icon, riseOnHover: true });
       m.on('click', () => setSelectedId(s.id));
@@ -289,15 +279,43 @@ function App() {
     
     // Collège de secteur de l'école trouvée
     let col = null;
+    let colExt = null; // collège hors périmètre MEL (mais avec ses données IPS/VA si présentes)
     if (ec.cs) {
-      const csName = typeof ec.cs === 'string' ? ec.cs : ec.cs.n;
-      if (csName) {
-        const clean = csName.replace('Collège ', '').replace(/\(.+?\)/, '').trim().toLowerCase();
-        col = D.find(x => x.t === 'c' && x.n.toLowerCase().includes(clean));
+      // Nouveau format objet : {n, uai, ext, i, va, br}
+      if (typeof ec.cs === 'object') {
+        // 1) Match par UAI (100% fiable)
+        if (ec.cs.uai) {
+          col = D.find(x => x.t === 'c' && x.id === ec.cs.uai);
+        }
+        // 2) Si pas trouvé dans D (collège hors MEL), on garde l'objet cs
+        // qui contient déjà n, i, va, br pour affichage minimal
+        if (!col && ec.cs.n) {
+          colExt = { 
+            n: ec.cs.n, 
+            uai: ec.cs.uai, 
+            i: ec.cs.i,           // IPS
+            va: ec.cs.va,         // valeur ajoutée brevet
+            br: ec.cs.br,         // taux brevet
+            c: 'Hors périmètre MEL'
+          };
+        }
+      } 
+      // Ancien format string : "Collège X (UAI)"
+      else if (typeof ec.cs === 'string') {
+        // Essayer d'extraire un UAI entre parenthèses
+        const uaiMatch = ec.cs.match(/\(([0-9]{7}[A-Z])\)/);
+        if (uaiMatch) {
+          col = D.find(x => x.t === 'c' && x.id === uaiMatch[1]);
+        }
+        // Sinon match par nom
+        if (!col) {
+          const clean = ec.cs.replace('Collège ', '').replace(/\(.+?\)/, '').trim().toLowerCase();
+          col = D.find(x => x.t === 'c' && x.n.toLowerCase().includes(clean));
+        }
       }
     }
     
-    setAddrResult({ label: addr.label, ec, col, dist: ec.dist });
+    setAddrResult({ label: addr.label, ec, col, colExt, dist: ec.dist });
   }
   
   /* ========= RENDER ========= */
@@ -315,13 +333,20 @@ function App() {
         <div className="top-actions">
           {compareIds.length > 0 && (
             <button 
-              className="compare-btn"
+              className={`top-compare ${compareIds.length === 2 ? 'ready' : 'pending'}`}
               onClick={() => compareIds.length === 2 ? setCompareOpen(true) : null}
               title={compareIds.length === 2 ? "Comparer les 2 écoles" : "Sélectionnez une 2e école pour comparer"}
             >
-              <span className="compare-btn-icon">⇄</span>
-              <span className="compare-btn-count">{compareIds.length}/2</span>
-              <button className="compare-btn-close" onClick={(e) => { e.stopPropagation(); setCompareIds([]); }} title="Effacer">×</button>
+              <span className="top-compare-label">
+                {compareIds.length === 2 ? 'Comparer' : 'Comparer'}
+              </span>
+              <span className="top-compare-count">{compareIds.length}/2</span>
+              <span 
+                className="top-compare-clear" 
+                role="button"
+                aria-label="Effacer la sélection"
+                onClick={(e) => { e.stopPropagation(); setCompareIds([]); }}
+              >×</span>
             </button>
           )}
           <button className="icon-btn" title="Comment ça marche ?" onClick={() => setBubble('ips')}>?</button>
@@ -390,7 +415,6 @@ function App() {
         <div className="legend-labels"><span>55</span><span>100</span><span>155</span></div>
         <div className="legend-footer">
           <div className="legend-footer-dot"></div>
-          <span>Pépites · VA ≥ +8</span>
         </div>
       </div>
       
@@ -650,13 +674,12 @@ function Sheet({ state, setState, list, selected, sort, setSort, onSelect, onBac
 }
 
 function SchoolCard({ s, onClick, index }) {
-  const pep = isPepite(s);
   const va = getVA(s);
   const br = s.iv?.brevet ?? s.iv?.bac;
   const delay = Math.min(0.14, index * 0.02);
   return (
     <div
-      className={`school-card ${pep ? 'pepite' : ''}`}
+      className={`school-card `}
       onClick={onClick}
       style={{ animationDelay: `${delay}s` }}
     >
@@ -665,7 +688,6 @@ function SchoolCard({ s, onClick, index }) {
           <div className="sc-tags">
             <span className="tag tag-type">{TL[s.t]}</span>
             <span className={`tag ${s.s === 'u' ? 'tag-public' : 'tag-prive'}`}>{SL[s.s]}</span>
-            {pep && <span className="tag tag-pepite">★ PÉPITE</span>}
             {s.f?.includes('REP+') && <span className="tag tag-rep">REP+</span>}
             {s.f?.includes('REP') && !s.f?.includes('REP+') && <span className="tag tag-rep">REP</span>}
             {s.sp?.includes('CHAM') && <span className="tag tag-type">♪ CHAM</span>}
@@ -719,7 +741,6 @@ function Detail({ s, onBack, onSelect, onSetBubble, compareIds, onToggleCompare 
   const va = getVA(s);
   const br = s.iv?.brevet ?? s.iv?.bac;
   const ipsPos = s.i ? Math.min(98, Math.max(2, (s.i - 55) / 100 * 100)) : 50;
-  const pep = isPepite(s);
   const cs = s.cs && typeof s.cs === 'object' ? s.cs : null;
   const linkedCollege = cs && cs.n ? D.find(x => x.t === 'c' && x.n.replace(/\s+/g,'').toLowerCase() === cs.n.replace('Collège ','').replace(/\s+/g,'').toLowerCase().replace(/\(.+?\)/,'')) : null;
   const inCompare = compareIds?.includes(s.id);
@@ -742,7 +763,6 @@ function Detail({ s, onBack, onSelect, onSetBubble, compareIds, onToggleCompare 
         <div className="detail-tags">
           <span className="tag tag-type">{TL[s.t]}</span>
           <span className={`tag ${s.s === 'u' ? 'tag-public' : 'tag-prive'}`}>{SL[s.s]}</span>
-          {pep && <span className="tag tag-pepite">★ PÉPITE · VA {vaSign(va)}</span>}
           {s.f?.includes('REP+') && <span className="tag tag-rep">REP+</span>}
           {s.f?.includes('REP') && !s.f?.includes('REP+') && <span className="tag tag-rep">REP</span>}
           {s.sp?.map(sp => (
@@ -824,7 +844,7 @@ function Detail({ s, onBack, onSelect, onSetBubble, compareIds, onToggleCompare 
               </div>
             )}
             {va != null && (
-              <div className={`kpi-card ${va >= 5 ? 'pepite' : va <= -5 ? 'neg' : ''}`}>
+              <div className={`kpi-card ${va >= 5 ? 'positive' : va <= -5 ? 'neg' : ''}`}>
                 <div className="kpi-l">Plus-value</div>
                 <div className={`kpi-v ${vaClass(va)}`}>{vaSign(va)}</div>
                 <div className="kpi-sub">
@@ -945,14 +965,16 @@ function AddressModal({ open, onClose, input, setInput, result, onSelectAddress,
       setLoading(true);
       try {
         // Recentrer sur Lille pour avoir des résultats locaux en priorité
-        const url = `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(input)}&limit=5&lat=50.633&lon=3.063&type=housenumber,street`;
+        // Note: ne pas utiliser type=housenumber,street (l'API renvoie 400, n'accepte qu'une valeur)
+        const url = `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(input)}&limit=5&lat=50.633&lon=3.063`;
         const res = await fetch(url);
         const data = await res.json();
         const features = (data.features || [])
           .filter(f => {
-            // Garder uniquement les communes de Lille Métropole
-            const ctx = (f.properties.context || '').toLowerCase();
-            return ctx.includes('59,') || ctx.includes('nord') || ctx.includes('hauts-de-france');
+            // Garder uniquement les communes du département du Nord (59)
+            // Les codes postaux MEL commencent par 59
+            const pc = (f.properties.postcode || '').toString();
+            return pc.startsWith('59');
           })
           .map(f => ({
             id: f.properties.id,
@@ -1094,7 +1116,6 @@ function AddressModal({ open, onClose, input, setInput, result, onSelectAddress,
                     {result.col.c}
                     {getVA(result.col) != null && ` · VA ${vaSign(getVA(result.col))}`}
                     {result.col.iv?.brevet != null && ` · Brevet ${result.col.iv.brevet}%`}
-                    {isPepite(result.col) && ' · ★ PÉPITE'}
                   </div>
                 </div>
                 {result.col.i && (
@@ -1103,6 +1124,32 @@ function AddressModal({ open, onClose, input, setInput, result, onSelectAddress,
                   </div>
                 )}
               </div>
+            )}
+            {result.ec && !result.col && result.colExt && (
+              <>
+                <div className="addr-chain">
+                  <div className="addr-chain-line"></div>
+                  <span>↓ rattaché au collège</span>
+                  <div className="addr-chain-line"></div>
+                </div>
+                <div className="addr-result addr-result-ext">
+                  <div className="addr-result-body">
+                    <div className="addr-result-k">Collège de secteur · hors périmètre</div>
+                    <div className="addr-result-n">{result.colExt.n}</div>
+                    <div className="addr-result-d">
+                      {result.colExt.va != null && `VA ${vaSign(result.colExt.va)}`}
+                      {result.colExt.va != null && result.colExt.br != null && ' · '}
+                      {result.colExt.br != null && `Brevet ${result.colExt.br}%`}
+                      {(result.colExt.va == null && result.colExt.br == null) && 'Données ministérielles'}
+                    </div>
+                  </div>
+                  {result.colExt.i != null && (
+                    <div className="cs-ips-mini" style={{ background: ipsColor(result.colExt.i) }}>
+                      {Math.round(result.colExt.i)}
+                    </div>
+                  )}
+                </div>
+              </>
             )}
           </div>
         )}
@@ -1287,41 +1334,47 @@ function CompareModal({ ids, onClose, onRemove }) {
   return (
     <div className="compare-modal" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="compare-panel">
+        
+        {/* Header style Detail : back button + titre + sous-titre */}
         <div className="compare-head">
-          <button className="compare-close" onClick={onClose}>✕ Fermer</button>
+          <button className="compare-back" onClick={onClose} aria-label="Fermer le comparateur">
+            <span aria-hidden="true">←</span> Retour
+          </button>
           <div className="compare-title">Comparer 2 écoles</div>
           <div className="compare-sub">Source · DEPP · Ministère de l'Éducation nationale</div>
         </div>
         
-        {/* Header avec 2 colonnes : nom + IPS + bouton retirer */}
+        {/* 2 colonnes en mode "carte fiche" : tags + nom + cercle IPS + adresse */}
         <div className="compare-cols-head">
           {cols.map((s, i) => (
             <div key={i} className="compare-col-head">
               {s ? (
                 <>
-                  <button className="compare-col-remove" onClick={() => onRemove(s.id)} title="Retirer">×</button>
+                  <button className="compare-col-remove" onClick={() => onRemove(s.id)} title="Retirer cette école" aria-label="Retirer">×</button>
                   <div className="compare-col-tags">
                     <span className="tag tag-type">{TL[s.t]}</span>
                     <span className={`tag ${s.s === 'u' ? 'tag-public' : 'tag-prive'}`}>{SL[s.s]}</span>
                   </div>
                   <div className="compare-col-name">{s.n}</div>
+                  <div className="compare-col-addr">{s.c}</div>
                   {s.i && (
-                    <div className="compare-col-ips" style={{ background: ipsColor(s.i) }}>
-                      IPS {Math.round(s.i)}
+                    <div className="compare-col-ips-circle" style={{ background: ipsColor(s.i) }}>
+                      <span className="n">{s.i_proxy ? '≈' : ''}{Math.round(s.i)}</span>
+                      <span className="l">IPS</span>
                     </div>
                   )}
                 </>
               ) : (
                 <div className="compare-col-empty">
                   <div className="compare-col-empty-icon">+</div>
-                  <div className="compare-col-empty-label">Sélectionnez une 2e école<br/><small>depuis la liste ou la carte</small></div>
+                  <div className="compare-col-empty-label">Sélectionnez une 2<sup>e</sup> école<br/><small>depuis la liste ou la carte</small></div>
                 </div>
               )}
             </div>
           ))}
         </div>
         
-        {/* Tableau des lignes de comparaison */}
+        {/* Lignes de comparaison */}
         <div className="compare-rows">
           {relevantRows.map(row => (
             <div className="compare-row" key={row.k}>
@@ -1336,7 +1389,7 @@ function CompareModal({ ids, onClose, onRemove }) {
         </div>
         
         <div className="compare-footer">
-          ℹ️ Les valeurs en italique (≈) sont des IPS estimés à partir de l'école voisine la plus proche.
+          Les valeurs précédées de <span className="mono">≈</span> sont des IPS estimés à partir de l'école voisine la plus proche.
         </div>
       </div>
     </div>
